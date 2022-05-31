@@ -28,10 +28,8 @@ class ECCMemory(size: Int) extends Module with Formal {
       val mid = m / 2
       for (j <- 0 until 8) {
         if (j % m < mid) {
-//          resetColParitySeq(id * 2) := resetColParitySeq(id * 2) ^ v(j)
           resetColParitySeq.updated(id * 2, resetColParitySeq(id * 2) ^ v(j))
         } else {
-//          resetColParitySeq(id * 2 + 1) := resetColParitySeq(id * 2 + 1) ^ v(j)
           resetColParitySeq.updated(id * 2 + 1, resetColParitySeq(id * 2 + 1) ^ v(j))
 
         }
