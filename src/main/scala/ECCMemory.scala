@@ -1,6 +1,5 @@
 import chisel3._
 import chisel3.util._
-import chisel3.util.random.XOR
 import chiselsby._
 
 
@@ -126,6 +125,7 @@ class ECCMemory(size: Int) extends Module with Formal {
   when(io.rdAddr === addr && flag.io.out === 1.U) {
     assert(data === io.rdData)
   }
+  assume(io.wrEna === false.B)
   assert(io.rdOK === true.B)
 }
 
