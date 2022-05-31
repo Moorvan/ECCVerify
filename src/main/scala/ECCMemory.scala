@@ -19,7 +19,7 @@ class ECCMemory(size: Int) extends Module with Formal {
   val mem = Mem(capacity, UInt(8.W))
 
   // Seq used for registers reset
-  var resetColParitySeq = Seq.fill(capacity)(false.B)
+  var colParitySeq = Seq.fill(capacity)(false.B)
   for (i <- 0 until capacity) {
     val v  = mem(i)
     var m  = 2
@@ -28,17 +28,16 @@ class ECCMemory(size: Int) extends Module with Formal {
       val mid = m / 2
       for (j <- 0 until 8) {
         if (j % m < mid) {
-          resetColParitySeq.updated(id * 2, resetColParitySeq(id * 2) ^ v(j))
+          colParitySeq.updated(id * 2, colParitySeq(id * 2) ^ v(j))
         } else {
-          resetColParitySeq.updated(id * 2 + 1, resetColParitySeq(id * 2 + 1) ^ v(j))
-
+          colParitySeq.updated(id * 2 + 1, colParitySeq(id * 2 + 1) ^ v(j))
         }
       }
       id += 1
       m *= 2
     }
   }
-  var resetRowParitySeq = Seq.fill(2 * nw)(false.B)
+  var rowParitySeq = Seq.fill(2 * nw)(false.B)
   for (i <- 0 until capacity) {
     val v = WireInit(false.B)
     v := mem(i).xorR
@@ -47,17 +46,17 @@ class ECCMemory(size: Int) extends Module with Formal {
     while (m != capacity * 2) {
       val mid = m / 2
       if (i % m < mid) {
-        resetRowParitySeq.updated(id * 2, resetRowParitySeq(id * 2) ^ v)
+        rowParitySeq.updated(id * 2, rowParitySeq(id * 2) ^ v)
       } else {
-        resetRowParitySeq.updated(id * 2 + 1, resetRowParitySeq(id * 2 + 1) ^ v)
+        rowParitySeq.updated(id * 2 + 1, rowParitySeq(id * 2 + 1) ^ v)
       }
       id += 1
       m *= 2
     }
   }
 
-  val colParity = RegInit(VecInit(resetColParitySeq))
-  val rowParity = RegInit(VecInit(resetRowParitySeq))
+  val colParity = RegInit(VecInit(colParitySeq))
+  val rowParity = RegInit(VecInit(rowParitySeq))
 
   when(io.wrEna) {
     val oldV = mem(io.wrAddr)
@@ -96,7 +95,21 @@ class ECCMemory(size: Int) extends Module with Formal {
     mem(io.wrAddr) := io.wrData
   }
   io.rdData := mem(io.rdAddr)
+
+
   io.rdOK := true.B
+
+  for (i <- 0 until capacity) {
+    when(colParitySeq(i) =/= colParity(i)) {
+      io.rdOK := false.B
+    }
+  }
+  for (i <- 0 until 2 * nw) {
+    when(rowParitySeq(i) =/= rowParity(i)) {
+      io.rdOK := false.B
+    }
+  }
+  
 
 
   // Formal Verification
@@ -113,6 +126,7 @@ class ECCMemory(size: Int) extends Module with Formal {
   when(io.rdAddr === addr && flag.io.out === 1.U) {
     assert(data === io.rdData)
   }
+  assert(io.rdOK === true.B)
 }
 
 
