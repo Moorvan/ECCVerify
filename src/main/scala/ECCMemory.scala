@@ -18,7 +18,7 @@ class ECCMemory(size: Int) extends Module with Formal {
   val mem = Mem(capacity, UInt(8.W))
 
   // Seq used for registers reset
-  var colParitySeq = Seq.fill(capacity)(false.B)
+  val colParitySeq = WireInit(VecInit(Seq.fill(6)(false.B)))
   for (i <- 0 until capacity) {
     val v  = mem(i)
     var m  = 2
@@ -27,16 +27,18 @@ class ECCMemory(size: Int) extends Module with Formal {
       val mid = m / 2
       for (j <- 0 until 8) {
         if (j % m < mid) {
-          colParitySeq.updated(id * 2, colParitySeq(id * 2) ^ v(j))
+//          colParitySeq.updated(id * 2, colParitySeq(id * 2) ^ v(j))
+          colParitySeq(id*2) := colParitySeq(id*2) ^ v(j)
         } else {
-          colParitySeq.updated(id * 2 + 1, colParitySeq(id * 2 + 1) ^ v(j))
+//          colParitySeq.updated(id * 2 + 1, colParitySeq(id * 2 + 1) ^ v(j))
+          colParitySeq(id*2+1) := colParitySeq(id*2+1) ^ v(j)
         }
       }
       id += 1
       m *= 2
     }
   }
-  var rowParitySeq = Seq.fill(2 * nw)(false.B)
+  var rowParitySeq = WireInit(VecInit(Seq.fill(2 * nw)(false.B)))
   for (i <- 0 until capacity) {
     val v = WireInit(false.B)
     v := mem(i).xorR
@@ -45,17 +47,19 @@ class ECCMemory(size: Int) extends Module with Formal {
     while (m != capacity * 2) {
       val mid = m / 2
       if (i % m < mid) {
-        rowParitySeq.updated(id * 2, rowParitySeq(id * 2) ^ v)
+//        rowParitySeq.updated(id * 2, rowParitySeq(id * 2) ^ v)
+        rowParitySeq(id*2) := rowParitySeq(id*2) ^ v
       } else {
-        rowParitySeq.updated(id * 2 + 1, rowParitySeq(id * 2 + 1) ^ v)
+//        rowParitySeq.updated(id * 2 + 1, rowParitySeq(id * 2 + 1) ^ v)
+        rowParitySeq(id*2+1) := rowParitySeq(id*2+1) ^ v
       }
       id += 1
       m *= 2
     }
   }
 
-  val colParity = RegInit(VecInit(colParitySeq))
-  val rowParity = RegInit(VecInit(rowParitySeq))
+  val colParity = RegInit(colParitySeq)
+  val rowParity = RegInit(rowParitySeq)
 
   when(io.wrEna) {
     val oldV = mem(io.wrAddr)
@@ -76,7 +80,7 @@ class ECCMemory(size: Int) extends Module with Formal {
       id += 1
       m *= 2
     }
-    when (oldV.xorR =/= newV.xorR) {
+    when(oldV.xorR =/= newV.xorR) {
       m = 2
       id = 0
       while (m != capacity * 2) {
@@ -98,17 +102,16 @@ class ECCMemory(size: Int) extends Module with Formal {
 
   io.rdOK := true.B
 
-  for (i <- 0 until capacity) {
+  for (i <- 0 until 6) {
     when(colParitySeq(i) =/= colParity(i)) {
       io.rdOK := false.B
     }
   }
   for (i <- 0 until 2 * nw) {
     when(rowParitySeq(i) =/= rowParity(i)) {
-      io.rdOK := false.B
+      //      io.rdOK := false.B
     }
   }
-  
 
 
   // Formal Verification
@@ -125,12 +128,12 @@ class ECCMemory(size: Int) extends Module with Formal {
   when(io.rdAddr === addr && flag.io.out === 1.U) {
     assert(data === io.rdData)
   }
-  assume(io.wrEna === false.B)
+  //  assume(io.wrEna === false.B)
   assert(io.rdOK === true.B)
 }
 
 
 object ECCMemory extends App {
-//  Check.generateRTL(() => new ECCMemory(16))
-    Check.kInduction(() => new ECCMemory(8))
+  //  Check.generateRTL(() => new ECCMemory(16))
+  Check.kInduction(() => new ECCMemory(8))
 }
