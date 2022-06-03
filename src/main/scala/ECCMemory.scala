@@ -15,7 +15,8 @@ class ECCMemory(size: Int) extends Module with Formal {
     val rdOK   = Output(Bool())
   })
 
-  val mem = Mem(capacity, UInt(8.W))
+  //  val mem = Mem(capacity, UInt(8.W))
+  val mem = RegInit(VecInit(Seq.fill(capacity)(0.U(8.W))))
 
 
   // Seq used for registers reset
@@ -72,8 +73,8 @@ class ECCMemory(size: Int) extends Module with Formal {
     m *= 2
   }
 
-  val colParity = RegInit(colParitySeq)
-  val rowParity = RegInit(rowParitySeq)
+  val colParity = RegInit(VecInit(Seq.fill(6)(false.B)))
+  val rowParity = RegInit(VecInit(Seq.fill(2 * nw)(false.B)))
 
   when(io.wrEna) {
     val oldV = mem(io.wrAddr)
@@ -81,16 +82,23 @@ class ECCMemory(size: Int) extends Module with Formal {
     var m    = 2
     var id   = 0
     while (m != 16) {
-      val mid = m / 2
+      val mid        = m / 2
+      val wireTmp0   = WireInit(VecInit(Seq.fill(8)(false.B)))
+      val wireTmp1   = WireInit(VecInit(Seq.fill(8)(false.B)))
+      var cnt0, cnt1 = 0
       for (j <- 0 until 8) {
         when(oldV(j) =/= newV(j)) {
           if (j % m < mid) {
-            colParity(id * 2) := colParity(id * 2) ^ true.B
+            wireTmp0(cnt0) := true.B
           } else {
-            colParity(id * 2 + 1) := colParity(id * 2 + 1) ^ true.B
+            wireTmp1(cnt1) := true.B
           }
         }
+        cnt0 += 1
+        cnt1 += 1
       }
+      colParity(id * 2) := colParity(id * 2) ^ wireTmp0.reduce(_ ^ _)
+      colParity(id * 2 + 1) := colParity(id * 2 + 1) ^ wireTmp1.reduce(_ ^ _)
       id += 1
       m *= 2
     }
@@ -127,7 +135,6 @@ class ECCMemory(size: Int) extends Module with Formal {
     }
   }
 
-
   // Formal Verification
   val flag_value = WireInit(0.U(1.W))
   val addr       = anyconst(nw)
@@ -147,6 +154,5 @@ class ECCMemory(size: Int) extends Module with Formal {
 
 
 object ECCMemory extends App {
-  //  Check.generateRTL(() => new ECCMemory(16))
   Check.kInduction(() => new ECCMemory(8))
 }

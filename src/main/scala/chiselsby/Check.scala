@@ -34,7 +34,7 @@ object Check {
     check(dutGen, "bmc", depth)
   }
 
-  def kInduction[T <: RawModule](dutGen: () => T, depth: Int = 20) = {
+  def kInduction[T <: RawModule](dutGen: () => T, depth: Int = 10) = {
     check(dutGen, "prove", depth)
   }
 
