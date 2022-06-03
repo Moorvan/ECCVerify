@@ -17,45 +17,59 @@ class ECCMemory(size: Int) extends Module with Formal {
 
   val mem = Mem(capacity, UInt(8.W))
 
+
   // Seq used for registers reset
   val colParitySeq = WireInit(VecInit(Seq.fill(6)(false.B)))
-  for (i <- 0 until capacity) {
-    val v  = mem(i)
-    var m  = 2
-    var id = 0
-    while (m != 16) {
-      val mid = m / 2
-      for (j <- 0 until 8) {
-        if (j % m < mid) {
-//          colParitySeq.updated(id * 2, colParitySeq(id * 2) ^ v(j))
-          colParitySeq(id*2) := colParitySeq(id*2) ^ v(j)
-        } else {
-//          colParitySeq.updated(id * 2 + 1, colParitySeq(id * 2 + 1) ^ v(j))
-          colParitySeq(id*2+1) := colParitySeq(id*2+1) ^ v(j)
+
+  var m  = 2
+  var id = 0
+  while (m != 16) {
+    val wireTmp0   = WireInit(VecInit(Seq.fill(capacity * 4)(false.B)))
+    val wireTmp1   = WireInit(VecInit(Seq.fill(capacity * 4)(false.B)))
+    var cnt0, cnt1 = 0
+    val mid        = m / 2
+    for (j <- 0 until 8) {
+      if (j % m < mid) {
+        for (i <- 0 until capacity) {
+          wireTmp0(cnt0) := mem(i)(j)
+          cnt0 += 1
+        }
+      } else {
+        for (i <- 0 until capacity) {
+          wireTmp1(cnt1) := mem(i)(j)
+          cnt1 += 1
         }
       }
-      id += 1
-      m *= 2
     }
+    colParitySeq(id * 2) := wireTmp0.reduce(_ ^ _)
+    colParitySeq(id * 2 + 1) := wireTmp1.reduce(_ ^ _)
+    id += 1
+    m *= 2
   }
-  var rowParitySeq = WireInit(VecInit(Seq.fill(2 * nw)(false.B)))
-  for (i <- 0 until capacity) {
-    val v = WireInit(false.B)
-    v := mem(i).xorR
-    var m  = 2
-    var id = 0
-    while (m != capacity * 2) {
-      val mid = m / 2
+
+
+  val rowParitySeq = WireInit(VecInit(Seq.fill(2 * nw)(false.B)))
+
+  m = 2
+  id = 0
+  while (m != capacity * 2) {
+    val wireTmp0   = WireInit(VecInit(Seq.fill(capacity / 2)(false.B)))
+    val wireTmp1   = WireInit(VecInit(Seq.fill(capacity / 2)(false.B)))
+    var cnt0, cnt1 = 0
+    val mid        = m / 2
+    for (i <- 0 until capacity) {
       if (i % m < mid) {
-//        rowParitySeq.updated(id * 2, rowParitySeq(id * 2) ^ v)
-        rowParitySeq(id*2) := rowParitySeq(id*2) ^ v
+        wireTmp0(cnt0) := mem(i).xorR
+        cnt0 += 1
       } else {
-//        rowParitySeq.updated(id * 2 + 1, rowParitySeq(id * 2 + 1) ^ v)
-        rowParitySeq(id*2+1) := rowParitySeq(id*2+1) ^ v
+        wireTmp1(cnt1) := mem(i).xorR
+        cnt1 += 1
       }
-      id += 1
-      m *= 2
     }
+    rowParitySeq(id * 2) := wireTmp0.reduce(_ ^ _)
+    rowParitySeq(id * 2 + 1) := wireTmp1.reduce(_ ^ _)
+    id += 1
+    m *= 2
   }
 
   val colParity = RegInit(colParitySeq)
@@ -109,7 +123,7 @@ class ECCMemory(size: Int) extends Module with Formal {
   }
   for (i <- 0 until 2 * nw) {
     when(rowParitySeq(i) =/= rowParity(i)) {
-      //      io.rdOK := false.B
+      io.rdOK := false.B
     }
   }
 
@@ -128,7 +142,6 @@ class ECCMemory(size: Int) extends Module with Formal {
   when(io.rdAddr === addr && flag.io.out === 1.U) {
     assert(data === io.rdData)
   }
-  //  assume(io.wrEna === false.B)
   assert(io.rdOK === true.B)
 }
 
